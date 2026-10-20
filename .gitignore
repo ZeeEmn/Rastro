@@ -1,0 +1,13 @@
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+# Generated reports and editor scratch files
+tempCodeRunnerFile.py
+# Local scan history
+/snapshots/
+Rastro_Report_*.txt
+Rastro_Report_*.csv
+Rastro_Scan_*.json

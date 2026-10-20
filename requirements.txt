@@ -1,0 +1,4 @@
+easymenu3==0.3.1
+psutil==7.2.2
+pick==2.6.0
+rich==15.0.0
