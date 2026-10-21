@@ -71,12 +71,23 @@ def load_snapshot(path):
     return data
 
 
+def scan_profile_and_method(scan_mode):
+    for method in ('TCP connect', 'TCP SYN'):
+        suffix = f' ({method})'
+        if scan_mode.endswith(suffix):
+            return scan_mode.removesuffix(suffix), method
+    # Snapshots saved before method selection used TCP connect.
+    return scan_mode, 'TCP connect'
+
+
 def compare_snapshots(before, after):
     #Return observation changes, keeping unscanned IPs separate from absent hosts.
     if before['network'] != after['network']:
         raise ValueError('Choose scans from the same subnet.')
-    if before['scan_mode'] != after['scan_mode']:
-        raise ValueError('Choose scans using the same scan mode.')
+    before_profile, _ = scan_profile_and_method(before['scan_mode'])
+    after_profile, _ = scan_profile_and_method(after['scan_mode'])
+    if before_profile != after_profile:
+        raise ValueError('Choose scans using the same scan profile (Fast, Standard, or Detailed Service).')
     old = {ip: host for ip, host in before['hosts'].items() if host['status'] == 'up'}
     new = {ip: host for ip, host in after['hosts'].items() if host['status'] == 'up'}
     changes = []
@@ -131,6 +142,11 @@ def compare_saved_scans():
         print(f"\nSCAN COMPARISON: {before['created_at']} -> {after['created_at']}")
         print('Changes describe scan observations by IP; they do not prove physical device identity.')
         changes = compare_snapshots(before, after)
+        print(f"Scan modes: {before['scan_mode']} -> {after['scan_mode']}")
+        _, before_method = scan_profile_and_method(before['scan_mode'])
+        _, after_method = scan_profile_and_method(after['scan_mode'])
+        if before_method != after_method:
+            print('Different TCP methods were used; observed differences may reflect the scan method rather than a network change.')
         for change in changes:
             print(f'- {change}')
         if not changes:

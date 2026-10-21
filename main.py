@@ -58,7 +58,8 @@ class Address:
 
 
 ### Nmap Command:
-### -sT: TCP scan, 
+### -sT: TCP connect scan
+### -sS: TCP SYN scan (requires raw-packet privileges)
 ### -Pn: Skip host discovery
 ### -oX -: output XML
 ### target at the end.
@@ -182,36 +183,74 @@ def host_collection(selected_interface):
         return [ip for ip, index in selected_hosts]
 
 
+def syn_tcp_check():
+    scan_type = ""
+    options =['TCP Connect scan','TCP SYN scan (requires raw-packet privileges)']
+    option, index = pick(options,title="Select scan type: ")
+    if index==0:
+        scan_type = "tcp"
+        return scan_type
+    elif index==1:
+        scan_type = "stealth"
+        return scan_type
 
-def scanning(targets):
+
+
+def scanning(targets,scan_type):
     try:
         results = []
         options=["Fast scan","Standard Scan","Detailed Service Scan","Back to main menu"]
-        option, index = pick(options,title="Choose scan type:")
-        if index==0:
+        option, index = pick(options,title="Choose scan mode:")
+        method = "TCP SYN" if scan_type == "stealth" else "TCP connect"
+        scan_mode = f"{option} ({method})"
+        if index==0 and scan_type=='tcp':
             for x in track(targets, description="Scanning..."):
                 result = subprocess.run(["nmap","-sT","-Pn","-F","-n","-oX","-",x],
                                         capture_output=True,
                                         text=True,
                                         check=True)
                 results.append(result.stdout)
-            return results, option
-        elif index==1:
+            return results, scan_mode
+        elif index==1 and scan_type=='tcp':
             for x in track(targets, description="Scanning..."):
                 result = subprocess.run(["nmap","-sT","-Pn","-oX","-",x],
                                         capture_output=True,
                                         text=True,
                                         check=True)
                 results.append(result.stdout)
-            return results, option
-        elif index==2:
+            return results, scan_mode
+        elif index==2 and scan_type=='tcp':
             for x in track(targets,description="Scanning..."):
                 result=subprocess.run(["nmap","-sT","-Pn","-sV","-n","-oX","-",x],
                                     capture_output=True,
                                     text=True,
                                     check=True)
                 results.append(result.stdout)
-            return results, option
+            return results, scan_mode
+        elif index==0 and scan_type=='stealth':
+            for x in track(targets, description="Scanning..."):
+                result=subprocess.run(["nmap","-sS","-Pn","-F","-n","-oX","-",x],
+                                      capture_output=True,
+                                      text=True,
+                                      check=True)
+                results.append(result.stdout)
+            return results,scan_mode
+        elif index==1 and scan_type=='stealth':
+            for x in track(targets, description="Scanning..."):
+                result=subprocess.run(["nmap","-sS","-Pn","-oX","-",x],
+                                      capture_output=True,
+                                      text=True,
+                                      check=True)
+                results.append(result.stdout)
+            return results,scan_mode
+        elif index==2 and scan_type=='stealth':
+            for x in track(targets,description="Scanning..."):
+                result=subprocess.run(["nmap","-sS","-Pn","-sV","-n","-oX","-",x],
+                                      capture_output=True,
+                                      text=True,
+                                      check=True)
+                results.append(result.stdout)
+            return results,scan_mode
         elif index==3:
             print("Returning to main menu.")
             return None
@@ -221,7 +260,10 @@ def scanning(targets):
         return sys.exit(1)
     except subprocess.CalledProcessError as e:
         print(f"Nmap failed: {e.stderr}")
-        return sys.exit(1)
+        if scan_type == "stealth":
+            print("TCP SYN scanning requires raw-packet privileges. Check elevated permissions and, on Windows, your Npcap installation.")
+            print("TCP connect scanning is available from the scan-method menu. No fallback scan was run.")
+        return None
 
 ### Parsing begins here
 
@@ -492,7 +534,8 @@ def run_scan():
     if not targets_list:
         return
 
-    scan_result = scanning(targets_list)
+    scan_type = syn_tcp_check()
+    scan_result = scanning(targets_list, scan_type)
     if scan_result is None:
         return
     results_list,scan_mode = scan_result
@@ -510,6 +553,7 @@ def run_scan():
     elif index == 1:
         export_csv(parse, selected_interface, scan_mode)
 
+    print(f"\nScan Mode: {scan_mode}")
     display(parse)
     if input("\nSave this scan for future comparison? (y/N): ").strip().lower() == 'y':
         try:
